@@ -1,3 +1,3 @@
-require './barcode-server'
-run Sinatra::Application
+require './lib/barcode-server'
+run BarcodeServer
 

@@ -1,22 +1,25 @@
-require 'sinatra'
+require 'sinatra/base'
 require 'gbarcode'
 require 'cocaine'
+require 'redcarpet'
 
 require 'debugger'
 
+class BarcodeServer < Sinatra::Base
+
 DEFAULT_OPTIONS = {
-	:encoding_format => DEFAULT_ENCODING, 
 	:width => 400, 
 	:height => 200, 
 	:resolution => 150, 
 	:antialias => false}
 
 get '/favicon.ico' do
-  send_file ''
+  send_file 'img/1px.gif'
 end
 
 get '/barcode/:symbology/:value' do
   opts = {:encoding_format => set_symbology(params[:symbology])}
+
   # querystring options
   opts[:width] = params[:width].to_i if params[:width]
   opts[:height] = params[:height].to_i if params[:height]
@@ -26,20 +29,23 @@ get '/barcode/:symbology/:value' do
   opts[:margin] = params[:margin].to_i if params[:margin]
 
   bc = barcode(params[:value], DEFAULT_OPTIONS.merge(opts)) 
-
   send_file bc, :type => :png
 
   File.delete(bc)
 end
 
+get '*' do
+  rm = File.new("README.md","rb")
+  erb markdown(rm.read)
+end
 
-def barcode(id, options = DEFAULT_OPTIONS)
+def barcode(data, options = DEFAULT_OPTIONS)
 
-  path = "#{File.dirname(__FILE__)}/barcodes" 
-  eps = "#{path}/#{id}.eps"
-  out = "#{path}/#{id}.png"
+  path = "#{File.dirname(__FILE__)}/../barcodes" 
+  eps = "#{path}/#{data}.eps"
+  out = "#{path}/#{data}.png"
       
-  bc = Gbarcode.barcode_create(id)
+  bc = Gbarcode.barcode_create(data)
   bc.width  = options[:width]          if options[:width]
   bc.height = options[:height]         if options[:height]
   bc.scalef = options[:scaling_factor] if options[:scaling_factor]
@@ -48,20 +54,13 @@ def barcode(id, options = DEFAULT_OPTIONS)
   bc.margin = options[:margin]         if options[:margin]
   Gbarcode.barcode_encode(bc, options[:encoding_format])
 
-  if options[:no_ascii]
-    print_options = Gbarcode::BARCODE_OUT_EPS|Gbarcode::BARCODE_NO_ASCII
-  else
-    print_options = Gbarcode::BARCODE_OUT_EPS
-  end
-
-  #encode the barcode object in desired format
+  #encode the barcode object with specified symbology
   File.open(eps,'wb') do |eps_img| 
-    Gbarcode.barcode_print(bc, eps_img, print_options)
+    Gbarcode.barcode_print(bc, eps_img, Gbarcode::BARCODE_OUT_EPS)
     eps_img.close
     convert_to_png(eps, out, options[:resolution], options[:antialias])
   end
   File.delete(eps) 
-
   #return png file path
   out
 end
@@ -106,4 +105,9 @@ def convert_to_png(src, out, resolution=nil, antialias=nil)
   end
   cmd = Cocaine::CommandLine.new("convert", "#{options.join(' ')} #{src} #{out}")
   cmd.run
+end
+
+  # start the server if ruby file executed directly
+  run! if app_file == $0
+
 end
