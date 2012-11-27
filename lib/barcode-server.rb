@@ -3,10 +3,14 @@ require 'gbarcode'
 require 'cocaine'
 require 'redcarpet'
 require 'fileutils'
+require 'digest/md5'
 
 require 'debugger'
 
 class BarcodeServer < Sinatra::Base
+  configure :production, :development do
+    enable :logging
+  end
 
   DEFAULT_OPTIONS = {
     :width => 400, 
@@ -14,19 +18,22 @@ class BarcodeServer < Sinatra::Base
     :resolution => 150, 
     :antialias => false}
 
+
   get '/favicon.ico' do
     send_file 'img/1px.gif'
   end
 
-  get '/barcode/:symbology/:data' do
-    opts = {:encoding_format => set_symbology(params[:symbology])}
+  get '/barcode/?:symbology?/?:data?/?' do
+    halt 404 unless params[:symbology]  
+    halt 501 unless params[:data]  
 
-    # querystring options
+    symbology =  set_symbology(params[:symbology])
+    logger.info "creating barcode: type #{symbology}"
+    
+    opts = {:encoding_format => symbology}
+    # other options from querystring
     opts[:width] = params[:width].to_i if params[:width]
     opts[:height] = params[:height].to_i if params[:height]
-    opts[:scaling_factor].to_i if params[:scaling_factor]
-    opts[:xoff] = params[:xoff].to_i if params[:xoff]
-    opts[:yoff] = params[:yoff].to_i if params[:yoff]
     opts[:margin] = params[:margin].to_i if params[:margin]
 
     bc = generate_barcode(params[:data], DEFAULT_OPTIONS.merge(opts)) 
@@ -35,7 +42,7 @@ class BarcodeServer < Sinatra::Base
     File.delete(bc)
   end
 
-  get '*' do
+  get '/info' do
     rm = File.new("README.md","rb")
     erb markdown(rm.read)
   end
@@ -50,15 +57,13 @@ class BarcodeServer < Sinatra::Base
   def generate_barcode(data, options = DEFAULT_OPTIONS)
 
     path = get_path
-    eps = "#{path}/#{data}.eps"
-    png = "#{path}/#{data}.png"
+    file = Digest::MD5.hexdigest(data)
+    eps = "#{path}/#{file}.eps"
+    png = "#{path}/#{file}.png"
         
     bc = Gbarcode.barcode_create(data)
     bc.width  = options[:width]          if options[:width]
     bc.height = options[:height]         if options[:height]
-    bc.xoff   = options[:xoff]           if options[:xoff]
-    bc.yoff   = options[:yoff]           if options[:yoff]
-    bc.scalef = options[:scaling_factor] if options[:scaling_factor]
     bc.margin = options[:margin]         if options[:margin]
     Gbarcode.barcode_encode(bc, options[:encoding_format])
 
