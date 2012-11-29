@@ -4,6 +4,7 @@ require 'cocaine'
 require 'redcarpet'
 require 'fileutils'
 require 'digest/md5'
+require 'qrencoder'
 
 require 'debugger'
 
@@ -12,11 +13,16 @@ class BarcodeServer < Sinatra::Base
     enable :logging
   end
 
-  DEFAULT_OPTIONS = {
+  DEFAULT_BARCODE_OPTIONS = {
     :width => 400, 
     :height => 200, 
+    :margin => 0,
     :resolution => 150, 
     :antialias => false}
+
+  DEFAULT_QRCODE_OPTIONS = {
+    :version => 4,
+    :pixels_per_module => 6}
 
 
   get '/favicon.ico' do
@@ -24,27 +30,36 @@ class BarcodeServer < Sinatra::Base
   end
 
   get '/barcode/?:symbology?/?:data?/?' do
-    halt 404 unless params[:symbology]  
     halt 501 unless params[:data]  
 
-    symbology =  set_symbology(params[:symbology])
-    logger.info "creating barcode: type #{symbology}"
-    
-    opts = {:encoding_format => symbology}
-    # other options from querystring
-    opts[:width] = params[:width].to_i if params[:width]
-    opts[:height] = params[:height].to_i if params[:height]
-    opts[:margin] = params[:margin].to_i if params[:margin]
+    symbology = set_symbology(params[:symbology])
+    opts = {:encoding_format => symbology}.merge(collect_opts([:width, :height, :margin]))
 
-    bc = generate_barcode(params[:data], DEFAULT_OPTIONS.merge(opts)) 
+    bc = generate_barcode(params[:data], DEFAULT_BARCODE_OPTIONS.merge(opts)) 
     send_file bc, :type => :png
 
     File.delete(bc)
   end
 
+  get '/qrcode/?:data?/?' do
+    halt 501 unless params[:data]  
+
+    opts = collect_opts([:version, :pixels_per_module])
+    png = generate_qrcode(params[:data], DEFAULT_QRCODE_OPTIONS.merge(opts))
+       
+    send_file png
+  end
+
   get '/info' do
     rm = File.new("README.md","rb")
     erb markdown(rm.read)
+  end
+
+  def collect_opts(options)
+    options.inject({}) do |opts,param|
+      opts[param] = params[param].to_i if params[param]
+      opts
+    end
   end
 
   def get_path
@@ -54,17 +69,26 @@ class BarcodeServer < Sinatra::Base
     file_path
   end
 
-  def generate_barcode(data, options = DEFAULT_OPTIONS)
+  def generate_qrcode(data, options)
+    file = Digest::MD5.hexdigest(data)
+    png = "#{get_path}/#{file}.png"
+  
+    qrcode = QREncoder.encode(data, {:version => options[:version]})
+    qrcode.png({:pixels_per_module => options[:pixels_per_module]}).save(png)
 
+    png # return png file path
+  end
+
+  def generate_barcode(data, options)
     path = get_path
     file = Digest::MD5.hexdigest(data)
     eps = "#{path}/#{file}.eps"
     png = "#{path}/#{file}.png"
         
     bc = Gbarcode.barcode_create(data)
-    bc.width  = options[:width]          if options[:width]
-    bc.height = options[:height]         if options[:height]
-    bc.margin = options[:margin]         if options[:margin]
+    bc.width  = options[:width] if options[:width]
+    bc.height = options[:height] if options[:height]
+    bc.margin = options[:margin] if options[:margin]
     Gbarcode.barcode_encode(bc, options[:encoding_format])
 
     #encode the barcode object with specified symbology
@@ -74,8 +98,8 @@ class BarcodeServer < Sinatra::Base
       convert_to_png(eps, png, options[:resolution], options[:antialias])
     end
     File.delete(eps) 
-    #return png file path
-    png
+    
+    png # return png file path
   end
 
   def set_symbology(fmt)
