@@ -17,7 +17,7 @@ class BarcodeServer < Sinatra::Base
     :width => 400, 
     :height => 200, 
     :margin => 0,
-    :resolution => 150, 
+    :resolution => 72, 
     :antialias => false}
 
   DEFAULT_QRCODE_OPTIONS = {
