@@ -49,6 +49,10 @@ You can supply additional parameters to alter the file that is produced. The fol
 
 The default width is __400__. The default height is __200__. The default margin is __10__.
 
+#### Text label
+
+By default there is no text included on the barcode image. You can add the text label by supplying the querystring parameter `text=1`.
+
 ### Generating QR Codes
 
 Requests to `server.tld/qrcode/<data>` will respond with a QR Code image.
@@ -79,4 +83,4 @@ Ensure that GET requests can accept sufficient data lengths for larger QR Codes 
 
 ## Credits
 
-The implementation of service was informed by the [barcode generator](https://github.com/anujluthra/barcode-generator) rails plugin by Anuj Luthra.
+The implementation of service was influenced by the [barcode generator](https://github.com/anujluthra/barcode-generator) rails plugin by Anuj Luthra.
