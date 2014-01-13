@@ -17,7 +17,7 @@ class BarcodeServer < Sinatra::Base
     :width => 400, 
     :height => 200, 
     :margin => 0,
-    :resolution => 72, 
+    :resolution => 150, 
     :antialias => false}
 
   DEFAULT_QRCODE_OPTIONS = {
@@ -33,7 +33,7 @@ class BarcodeServer < Sinatra::Base
     halt 400 unless params[:data]  
 
     symbology = set_symbology(params[:symbology])
-    opts = {:encoding_format => symbology}.merge(collect_opts([:width, :height, :margin, :text]))
+    opts = {:encoding_format => symbology}.merge(collect_opts([:width, :height, :margin]))
 
     bc = generate_barcode(params[:data], DEFAULT_BARCODE_OPTIONS.merge(opts)) 
     send_file bc, :type => :png
@@ -93,7 +93,7 @@ class BarcodeServer < Sinatra::Base
 
     #encode the barcode object with specified symbology
     File.open(eps,'wb') do |eps_file| 
-      Gbarcode.barcode_print(bc, eps_file, Gbarcode::BARCODE_OUT_EPS | (options[:text]==1 ? 0 : Gbarcode::BARCODE_NO_ASCII))
+      Gbarcode.barcode_print(bc, eps_file, Gbarcode::BARCODE_OUT_EPS)
       eps_file.close
       convert_to_png(eps, png, options[:resolution], options[:antialias])
     end
